@@ -2,13 +2,13 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>周小芸的瓜單</title>
+<title>周小芸ㄉ瓜單</title>
 <style>
 body {
     margin: 0;
     padding: 0;
     font-family: "Microsoft JhengHei", sans-serif;
-    background: #f0e6d2; /* 淡駝色底 */
+    background: #f0e6d2;
     color: #4a3f2f;
 }
 .container {
@@ -29,8 +29,6 @@ input, button {
 input { background: #e6d9c4; color: #4a3f2f; }
 button { background: #c9b599; color: #4a3f2f; cursor: pointer; }
 button:hover { background: #bfa987; }
-button.type-btn { background: #d0c0a0; margin: 3px; color: #4a3f2f; }
-button.type-btn.selected { background: #4a3f2f; color: #f0e6d2; }
 table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 10px; text-align: center; color: #4a3f2f; }
 th { background: #d0c0a0; }
@@ -49,7 +47,6 @@ tr:nth-child(even) { background: rgba(74,63,47,0.03); }
     transition: opacity 0.8s ease-in-out;
 }
 .random-box.show { opacity: 1; }
-#genreButtons { display: flex; flex-wrap: wrap; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -59,12 +56,10 @@ tr:nth-child(even) { background: rgba(74,63,47,0.03); }
 
 <input type="text" id="songName" placeholder="歌曲名稱">
 <input type="text" id="artist" placeholder="歌手">
-<input type="text" id="genre" placeholder="類型（多個請用逗號分隔）">
+<input type="text" id="genreInput" placeholder="輸入類型篩選" oninput="filterByGenre()">
 <button onclick="addSong()">新增歌曲</button>
 <button onclick="randomSong()">🎲 隨機抽歌</button>
 <button onclick="copySongList()">📋 複製全部歌曲+歌手</button>
-
-<div id="genreButtons"></div>
 <button onclick="resetFilter()">重置篩選</button>
 
 <table>
@@ -85,53 +80,42 @@ tr:nth-child(even) { background: rgba(74,63,47,0.03); }
 <script>
 let songs = [];
 let filteredSongs = null;
-const genreList = ["新歌","女歌手","男歌手","抒情","流行","甜歌","經典"];
+
+// CSV 連結
 const gsheetCSV = "https://docs.google.com/spreadsheets/d/1YIUx1gfY1xczRMN5fr-U_q-rIDZxyTaJc2UZejLczQk/export?format=csv";
 
-const genreButtonsDiv = document.getElementById("genreButtons");
-genreList.forEach(genre=>{
-    const btn = document.createElement("button");
-    btn.innerText = genre;
-    btn.className = "type-btn";
-    btn.onclick = ()=> toggleGenre(btn);
-    genreButtonsDiv.appendChild(btn);
-});
-
-function toggleGenre(btn){
-    btn.classList.toggle("selected");
-    multiFilter();
-}
-
-// 讀取 Google Sheet CSV
+// 讀取 CSV
 fetch(gsheetCSV)
-.then(response => response.text())
-.then(data => {
+.then(res=>res.text())
+.then(data=>{
     const rows = data.split("\n");
     rows.slice(1).forEach(row=>{
-    const cols = row.split(";");
+        const cols = row.split(",");
         if(cols.length>=3){
             songs.push({name: cols[0].trim(), artist: cols[1].trim(), genre: cols[2].trim()});
         }
     });
     renderTable();
 })
-.catch(err=>console.error("載入 CSV 失敗:",err));
+.catch(err=>console.error("CSV 載入失敗:", err));
 
+// 新增歌曲
 function addSong(){
     const name = document.getElementById("songName").value.trim();
     const artist = document.getElementById("artist").value.trim();
-    const genre = document.getElementById("genre").value.trim();
+    const genre = document.getElementById("genreInput").value.trim();
     if(!name || !artist || !genre){ alert("請填寫完整資訊"); return; }
     songs.push({name, artist, genre});
     renderTable();
     clearInputs();
 }
 
+// 渲染表格
 function renderTable(list = songs){
     const table = document.getElementById("songTable");
-    table.innerHTML="";
+    table.innerHTML = "";
     list.forEach((song,index)=>{
-        table.innerHTML+=`
+        table.innerHTML += `
         <tr>
         <td>${song.name}</td>
         <td>${song.artist}</td>
@@ -141,49 +125,50 @@ function renderTable(list = songs){
     });
 }
 
+// 複製單行
 function copyRow(index){
     const list = filteredSongs || songs;
     const song = list[index];
     navigator.clipboard.writeText(`${song.name} - ${song.artist}`)
-        .then(()=> alert("已複製到剪貼簿!"))
-        .catch(()=> alert("複製失敗"));
+    .then(()=> alert("已複製到剪貼簿!"))
+    .catch(()=> alert("複製失敗"));
 }
 
+// 複製全部歌曲
 function copySongList(){
     const list = filteredSongs || songs;
     if(list.length===0){ alert("歌單空的"); return; }
     let text = list.map(s=>`${s.name} - ${s.artist}`).join("\n");
     navigator.clipboard.writeText(text)
-        .then(()=> alert("已複製到剪貼簿!"))
-        .catch(()=> alert("複製失敗"));
+    .then(()=> alert("已複製到剪貼簿!"))
+    .catch(()=> alert("複製失敗"));
 }
 
+// 清空輸入框
 function clearInputs(){
     document.getElementById("songName").value="";
     document.getElementById("artist").value="";
-    document.getElementById("genre").value="";
+    document.getElementById("genreInput").value="";
 }
 
-function multiFilter(){
-    const selectedGenres = Array.from(document.getElementsByClassName("type-btn"))
-        .filter(btn=>btn.classList.contains("selected"))
-        .map(btn=>btn.innerText.toLowerCase());
-    if(selectedGenres.length===0){ renderTable(); filteredSongs=null; return; }
-    filteredSongs = songs.filter(song=>{
-        const genres = song.genre.toLowerCase().split(",");
-        return genres.some(g=>selectedGenres.includes(g.trim()));
-    });
+// 即時按類型篩選
+function filterByGenre(){
+    const val = document.getElementById("genreInput").value.trim().toLowerCase();
+    if(!val){ filteredSongs=null; renderTable(); return; }
+    filteredSongs = songs.filter(song => song.genre.toLowerCase().includes(val));
     renderTable(filteredSongs);
 }
 
+// 重置篩選
 function resetFilter(){
-    Array.from(document.getElementsByClassName("type-btn")).forEach(btn=>btn.classList.remove("selected"));
     filteredSongs=null;
+    document.getElementById("genreInput").value="";
     renderTable();
 }
 
+// 隨機抽歌
 function randomSong(){
-    const list = filteredSongs||songs;
+    const list = filteredSongs || songs;
     if(list.length===0){ alert("歌單是空的"); return; }
     const randomIndex = Math.floor(Math.random()*list.length);
     const song = list[randomIndex];
