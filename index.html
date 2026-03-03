@@ -8,33 +8,14 @@ body {
     margin: 0;
     padding: 0;
     font-family: "Microsoft JhengHei", sans-serif;
-    background: #f0e6d2; /* 淡駝色背景 */
-    color: #4a3f2f; /* 深棕文字，清楚可讀 */
-}
-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 30px;
-    background: rgba(74,63,47,0.1); /* 半透明深棕 */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-h1 {
-    font-size: 26px;
+    background: #f0e6d2; /* 淡駝色底 */
     color: #4a3f2f;
-    margin: 0;
 }
-a.nav-link {
-    color: #4a3f2f;
-    text-decoration: none;
-    font-weight: bold;
-}
-a.nav-link:hover { text-decoration: underline; }
 .container {
     max-width: 1000px;
     margin: 30px auto;
     padding: 20px;
-    background: rgba(74,63,47,0.05); /* 淡棕半透明容器 */
+    background: rgba(74,63,47,0.05);
     border-radius: 15px;
     backdrop-filter: blur(4px);
 }
@@ -54,7 +35,7 @@ table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 14p
 th, td { padding: 10px; text-align: center; color: #4a3f2f; }
 th { background: #d0c0a0; }
 tr:nth-child(even) { background: rgba(74,63,47,0.03); }
-.delete-btn { background: #b58a70; color: #fff; }
+.copy-btn { background: #b58a70; color: #fff; cursor: pointer; }
 .random-box {
     margin-top: 20px;
     padding: 15px;
@@ -73,17 +54,15 @@ tr:nth-child(even) { background: rgba(74,63,47,0.03); }
 </head>
 <body>
 
-<header>
-<h1>快選給我R 🎧</h1>
-<a class="nav-link" href="#">首頁</a>
-</header>
-
 <div class="container">
+<h1>快選給我R</h1>
+
 <input type="text" id="songName" placeholder="歌曲名稱">
 <input type="text" id="artist" placeholder="歌手">
 <input type="text" id="genre" placeholder="類型（多個請用逗號分隔）">
 <button onclick="addSong()">新增歌曲</button>
 <button onclick="randomSong()">🎲 隨機抽歌</button>
+<button onclick="copySongList()">📋 複製全部歌曲+歌手</button>
 
 <div id="genreButtons"></div>
 <button onclick="resetFilter()">重置篩選</button>
@@ -94,7 +73,7 @@ tr:nth-child(even) { background: rgba(74,63,47,0.03); }
 <th>歌曲</th>
 <th>歌手</th>
 <th>類型</th>
-<th>刪除</th>
+<th>複製</th>
 </tr>
 </thead>
 <tbody id="songTable"></tbody>
@@ -123,6 +102,7 @@ function toggleGenre(btn){
     multiFilter();
 }
 
+// 讀取 Google Sheet CSV
 fetch(gsheetCSV)
 .then(response => response.text())
 .then(data => {
@@ -156,32 +136,26 @@ function renderTable(list = songs){
         <td>${song.name}</td>
         <td>${song.artist}</td>
         <td>${song.genre}</td>
-        <td><button class="delete-btn" onclick="deleteSong(${index})">刪除</button></td>
+        <td><button class="copy-btn" onclick="copyRow(${index})">📋 複製</button></td>
         </tr>`;
     });
 }
 
-function deleteSong(index){
-    if(filteredSongs){
-        const songToDelete = filteredSongs[index];
-        songs = songs.filter(s=>s!==songToDelete);
-        filteredSongs=null;
-    }else{
-        songs.splice(index,1);
-    }
-    renderTable();
+function copyRow(index){
+    const list = filteredSongs || songs;
+    const song = list[index];
+    navigator.clipboard.writeText(`${song.name} - ${song.artist}`)
+        .then(()=> alert("已複製到剪貼簿!"))
+        .catch(()=> alert("複製失敗"));
 }
 
-function randomSong(){
-    const list = filteredSongs||songs;
-    if(list.length===0){ alert("歌單是空的"); return; }
-    const randomIndex = Math.floor(Math.random()*list.length);
-    const song = list[randomIndex];
-    const box = document.getElementById("randomResult");
-    box.classList.remove("show");
-    box.offsetWidth;
-    box.innerHTML = `🎶 ${song.name} - ${song.artist} (${song.genre})`;
-    box.classList.add("show");
+function copySongList(){
+    const list = filteredSongs || songs;
+    if(list.length===0){ alert("歌單空的"); return; }
+    let text = list.map(s=>`${s.name} - ${s.artist}`).join("\n");
+    navigator.clipboard.writeText(text)
+        .then(()=> alert("已複製到剪貼簿!"))
+        .catch(()=> alert("複製失敗"));
 }
 
 function clearInputs(){
@@ -206,6 +180,18 @@ function resetFilter(){
     Array.from(document.getElementsByClassName("type-btn")).forEach(btn=>btn.classList.remove("selected"));
     filteredSongs=null;
     renderTable();
+}
+
+function randomSong(){
+    const list = filteredSongs||songs;
+    if(list.length===0){ alert("歌單是空的"); return; }
+    const randomIndex = Math.floor(Math.random()*list.length);
+    const song = list[randomIndex];
+    const box = document.getElementById("randomResult");
+    box.classList.remove("show");
+    box.offsetWidth;
+    box.innerHTML = `🎶 ${song.name} - ${song.artist} (${song.genre})`;
+    box.classList.add("show");
 }
 </script>
 
