@@ -5,22 +5,24 @@
 <title>YUN</title>
 <style>
 body { margin:0; padding:0; font-family:"Microsoft JhengHei",sans-serif; background:#f0e6d2; color:#4a3f2f;}
-.container { max-width:1000px; margin:30px auto; padding:20px; background:rgba(74,63,47,0.05); border-radius:15px; backdrop-filter:blur(4px);}
-button { padding:8px 12px; margin:3px; border-radius:8px; border:none; font-size:14px; cursor:pointer;}
-button:hover { background:#bfa987;}
+.container { max-width:1000px; margin:30px auto; padding:20px; background:rgba(74,63,47,0.05); border-radius:15px;}
+input { padding:8px 12px; margin:5px 0; border-radius:8px; border:none; font-size:14px; background:#e6d9c4; color:#4a3f2f; width:100%;}
+button { padding:6px 12px; margin:3px; border-radius:8px; border:none; font-size:14px; cursor:pointer;}
 button.type-btn { background:#d0c0a0; color:#4a3f2f; }
 button.type-btn.selected { background:#4a3f2f; color:#f0e6d2; }
-table { width:100%; margin-top:20px; border-collapse:collapse; font-size:14px; }
-th, td { padding:10px; text-align:center; color:#4a3f2f; }
-th { background:#d0c0a0; }
-tr:nth-child(even) { background:rgba(74,63,47,0.03); }
-.copy-btn { background:#b58a70; color:#fff; cursor:pointer;}
-#genreButtons { display:flex; flex-wrap:wrap; margin-top:10px; }
+button.copy-btn { background:#b58a70; color:#fff;}
+table { width:100%; margin-top:15px; border-collapse:collapse; font-size:14px;}
+th, td { padding:10px; text-align:center;}
+th { background:#d0c0a0;}
+tr:nth-child(even) { background:rgba(74,63,47,0.03);}
+#genreButtons { display:flex; flex-wrap:wrap; margin-top:10px;}
 </style>
 </head>
 <body>
 <div class="container">
-<h1>🎼周小芸ㄉ歌單</h1>
+<h1>🎼周小芸ㄉ瓜單</h1>
+
+<input type="text" id="searchInput" placeholder="搜尋歌名或歌手..." onkeyup="applyFilters()">
 
 <div id="genreButtons"></div>
 
@@ -32,15 +34,14 @@ tr:nth-child(even) { background:rgba(74,63,47,0.03); }
 </table>
 </div>
 
-<!-- PapaParse -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <script>
-let songs=[], filteredSongs=null, genreList=[];
-const gsheetCSV = "https://docs.google.com/spreadsheets/d/1YIUx1gfY1xczRMN5fr-U_q-rIDZxyTaJc2UZejLczQk/export?format=csv";
-const genreButtonsDiv = document.getElementById("genreButtons");
+let songs = [];
+let selectedGenres = [];
 
-// 讀 CSV
+const gsheetCSV = "https://docs.google.com/spreadsheets/d/1YIUx1gfY1xczRMN5fr-U_q-rIDZxyTaJc2UZejLczQk/export?format=csv";
+
 Papa.parse(gsheetCSV, {
     download: true,
     header: true,
@@ -50,65 +51,77 @@ Papa.parse(gsheetCSV, {
             const songName = row["歌名"]?.trim();
             const artist = row["歌手"]?.trim();
             const genres = Object.keys(row).slice(2).map(k=>row[k]?.trim()).filter(g=>g);
-            if(songName && artist && genres.length>0){
+
+            if(songName && artist){
                 songs.push({name:songName, artist:artist, genre:genres});
-                genres.forEach(g=>{
-                    if(g && !genreList.includes(g)) genreList.push(g);
-                });
             }
         });
         createGenreButtons();
-        renderTable();
+        renderTable(songs);
     }
 });
 
-// 建立類型按鈕
 function createGenreButtons(){
-    genreButtonsDiv.innerHTML="";
-    genreList.forEach(genre=>{
-        const btn=document.createElement("button");
-        btn.innerText=genre;
-        btn.className="type-btn";
-        btn.onclick=()=> toggleGenre(btn);
-        genreButtonsDiv.appendChild(btn);
+    const genreSet = new Set();
+    songs.forEach(song => song.genre.forEach(g => genreSet.add(g)));
+
+    const container = document.getElementById("genreButtons");
+    container.innerHTML = "";
+
+    genreSet.forEach(genre=>{
+        const btn = document.createElement("button");
+        btn.innerText = genre;
+        btn.className = "type-btn";
+        btn.onclick = ()=>{
+            btn.classList.toggle("selected");
+            if(selectedGenres.includes(genre)){
+                selectedGenres = selectedGenres.filter(g=>g!==genre);
+            } else {
+                selectedGenres.push(genre);
+            }
+            applyFilters();
+        };
+        container.appendChild(btn);
     });
 }
 
-// 類型篩選
-function toggleGenre(btn){
-    btn.classList.toggle("selected");
-    const selectedGenres = Array.from(document.getElementsByClassName("type-btn"))
-        .filter(b=>b.classList.contains("selected"))
-        .map(b=>b.innerText.toLowerCase());
-    if(selectedGenres.length===0){ filteredSongs=null; renderTable(); return; }
-    filteredSongs = songs.filter(song=>{
-        const gs = song.genre.map(g=>g.toLowerCase());
-        return gs.some(g=>selectedGenres.includes(g));
+function applyFilters(){
+    const keyword = document.getElementById("searchInput").value.toLowerCase();
+
+    let filtered = songs.filter(song=>{
+        const matchSearch =
+            song.name.toLowerCase().includes(keyword) ||
+            song.artist.toLowerCase().includes(keyword);
+
+        const matchGenre =
+            selectedGenres.length === 0 ||
+            song.genre.some(g => selectedGenres.includes(g));
+
+        return matchSearch && matchGenre;
     });
-    renderTable(filteredSongs);
+
+    renderTable(filtered);
 }
 
-// 渲染表格
-function renderTable(list=songs){
-    const table=document.getElementById("songTable");
-    table.innerHTML="";
+function renderTable(list){
+    const table = document.getElementById("songTable");
+    table.innerHTML = "";
+
     list.forEach((song,index)=>{
-        table.innerHTML+=`<tr><td>${song.name}</td><td>${song.artist}</td><td>${song.genre.join("; ")}</td><td><button class="copy-btn" onclick="copyRow(${index})">📋 複製</button></td></tr>`;
+        table.innerHTML += `
+        <tr>
+            <td>${song.name}</td>
+            <td>${song.artist}</td>
+            <td>${song.genre.join(" / ")}</td>
+            <td><button class="copy-btn" onclick="copySong('${song.name} - ${song.artist}')">📋</button></td>
+        </tr>`;
     });
 }
 
-// 複製單行
-function copyRow(index){
-    const list=filteredSongs||songs;
-    const song=list[index];
-    navigator.clipboard.writeText(`${song.name} - ${song.artist}`).then(()=>alert("已複製到剪貼簿!")).catch(()=>alert("複製失敗"));
-}
-
-// 重置篩選
-function resetFilter(){
-    filteredSongs=null;
-    Array.from(document.getElementsByClassName("type-btn")).forEach(btn=>btn.classList.remove("selected"));
-    renderTable();
+function copySong(text){
+    navigator.clipboard.writeText(text)
+    .then(()=>alert("已複製"))
+    .catch(()=>alert("複製失敗"));
 }
 </script>
 </body>
