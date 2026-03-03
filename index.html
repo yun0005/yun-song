@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>周小芸ㄉ歌單</title>
+<title>周小芸ㄉ瓜單</title>
 <style>
 body { margin:0; padding:0; font-family:"Microsoft JhengHei",sans-serif; background:#f0e6d2; color:#4a3f2f;}
 .container { max-width:1000px; margin:30px auto; padding:20px; background:rgba(74,63,47,0.05); border-radius:15px; backdrop-filter:blur(4px);}
@@ -44,33 +44,35 @@ tr:nth-child(even) { background:rgba(74,63,47,0.03); }
 <div class="random-box" id="randomResult">還沒抽歌 🎵</div>
 </div>
 
+<!-- PapaParse -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
 <script>
 let songs=[], filteredSongs=null, genreList=[];
 const gsheetCSV = "https://docs.google.com/spreadsheets/d/1YIUx1gfY1xczRMN5fr-U_q-rIDZxyTaJc2UZejLczQk/export?format=csv";
 const genreButtonsDiv = document.getElementById("genreButtons");
 
-// 讀 CSV
-fetch(gsheetCSV)
-.then(res => res.text())
-.then(data => {
-    const rows = data.split(/\r?\n/); // 支援不同系統換行
-    rows.slice(1).forEach(row => {
-        if(!row.trim()) return; // 忽略空行
-        const cols = row.split(",");
-        if(cols.length >= 3){
-            const songName = cols[0].trim();
-            const artist = cols[1].trim();
-            const genres = cols.slice(2).map(g => g.trim()).filter(g => g);
-            if(!songName || !artist || genres.length === 0) return; // 避免空資料
-            const song = { name: songName, artist: artist, genre: genres };
-            songs.push(song);
-            genres.forEach(g => { if(g && !genreList.includes(g)) genreList.push(g); });
-        }
-    });
-    createGenreButtons();
-    renderTable();
-})
-.catch(err => console.error("CSV 載入失敗:", err));
+// 讀 CSV 用 PapaParse
+Papa.parse(gsheetCSV, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results){
+        results.data.forEach(row=>{
+            const songName = row["歌名"]?.trim();
+            const artist = row["歌手"]?.trim();
+            const genres = Object.keys(row).slice(2).map(k=>row[k]?.trim()).filter(g=>g);
+            if(songName && artist && genres.length>0){
+                songs.push({name:songName, artist:artist, genre:genres});
+                genres.forEach(g=>{
+                    if(g && !genreList.includes(g)) genreList.push(g);
+                });
+            }
+        });
+        createGenreButtons();
+        renderTable();
+    }
+});
 
 // 建立類型按鈕
 function createGenreButtons(){
@@ -149,13 +151,15 @@ function clearInputs(){
 
 // 隨機抽歌
 function randomSong(){
-    const list=filteredSongs||songs;
+    const list = filteredSongs?.length ? filteredSongs : songs;
     if(list.length===0){ alert("歌單空的"); return; }
-    const song=list[Math.floor(Math.random()*list.length)];
-    const box=document.getElementById("randomResult");
-    box.classList.remove("show"); box.offsetWidth;
-    box.innerHTML=`🎶 ${song.name} - ${song.artist} (${song.genre.join("; ")})`;
-    box.classList.add("show");
+    const song = list[Math.floor(Math.random()*list.length)];
+    const box = document.getElementById("randomResult");
+    box.classList.remove("show");
+    setTimeout(()=>{
+        box.innerHTML = `🎶 ${song.name} - ${song.artist} (${song.genre.join("; ")})`;
+        box.classList.add("show");
+    },50);
 }
 </script>
 </body>
