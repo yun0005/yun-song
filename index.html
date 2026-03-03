@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>我的歌單網頁</title>
+<style>
+body {
+    background: linear-gradient(135deg,#2e2f60,#4a4a8f,#6a63b3);
+    font-family: "Microsoft JhengHei", sans-serif;
+    color: #ffffff;
+    padding: 20px;
+}
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+h1 {
+    color: #dcdcff;
+    text-shadow: none;
+}
+a.nav-link {
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: bold;
+}
+a.nav-link:hover { text-decoration: underline; }
+.container {
+    background: rgba(255,255,255,0.08);
+    padding: 20px;
+    border-radius: 15px;
+    backdrop-filter: blur(6px);
+    margin-top: 20px;
+}
+input, button {
+    padding: 8px;
+    margin: 5px;
+    border-radius: 8px;
+    border: none;
+}
+input { background: #4a4a8f; color: #ffffff; }
+button { background: #7a6dff; color: #fff; cursor: pointer; }
+button:hover { background: #9a8fff; }
+button.type-btn { background: #5c57a0; margin: 3px; color: #fff; }
+button.type-btn.selected { background: #ffdfff; color: #4a4a8f; }
+table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+th, td { padding: 10px; text-align: center; color: #ffffff; }
+th { background: #5c57a0; }
+tr:nth-child(even) { background: rgba(255,255,255,0.05); }
+.delete-btn { background: #ff7a8f; color: #fff; }
+.random-box {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: none;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+}
+.random-box.show {
+    opacity: 1;
+}
+</style>
+</head>
+<body>
+
+<header>
+<h1>🎵 我的歌單網頁</h1>
+<a class="nav-link" href="#">首頁</a>
+</header>
+
+<div class="container">
+<input type="text" id="songName" placeholder="歌曲名稱">
+<input type="text" id="artist" placeholder="歌手">
+<input type="text" id="genre" placeholder="類型（多個請用逗號分隔）">
+<button onclick="addSong()">新增歌曲</button>
+<button onclick="randomSong()">🎲 隨機抽歌</button>
+
+<div id="genreButtons" style="margin-top:15px;"></div>
+<button onclick="resetFilter()">重置篩選</button>
+
+<table>
+<thead>
+<tr>
+<th>歌曲</th>
+<th>歌手</th>
+<th>類型</th>
+<th>刪除</th>
+</tr>
+</thead>
+<tbody id="songTable"></tbody>
+</table>
+
+<div class="random-box" id="randomResult">還沒抽歌 🎵</div>
+</div>
+
+<script>
+let songs = [];
+let filteredSongs = null;
+// 這裡設定你要的篩選類型
+const genreList = ["流行","抒情","搖滾","R&B"];
+// Google Sheet CSV 連結
+const gsheetCSV = "https://docs.google.com/spreadsheets/d/1YIUx1gfY1xczRMN5fr-U_q-rIDZxyTaJc2UZejLczQk/export?format=csv";
+
+// 產生類型按鈕
+const genreButtonsDiv = document.getElementById("genreButtons");
+genreList.forEach(genre=>{
+    const btn = document.createElement("button");
+    btn.innerText = genre;
+    btn.className = "type-btn";
+    btn.onclick = ()=> toggleGenre(btn);
+    genreButtonsDiv.appendChild(btn);
+});
+
+function toggleGenre(btn){
+    btn.classList.toggle("selected");
+    multiFilter();
+}
+
+// 讀取 CSV
+fetch(gsheetCSV)
+.then(response => response.text())
+.then(data => {
+    const rows = data.split("\n");
+    rows.slice(1).forEach(row=>{
+        const cols = row.split(",");
+        if(cols.length>=3){
+            songs.push({name: cols[0].trim(), artist: cols[1].trim(), genre: cols[2].trim()});
+        }
+    });
+    renderTable();
+})
+.catch(err=>console.error("載入 CSV 失敗:",err));
+
+function addSong(){
+    const name = document.getElementById("songName").value.trim();
+    const artist = document.getElementById("artist").value.trim();
+    const genre = document.getElementById("genre").value.trim();
+    if(!name || !artist || !genre){ alert("請填寫完整資訊"); return; }
+    songs.push({name, artist, genre});
+    renderTable();
+    clearInputs();
+}
+
+function renderTable(list = songs){
+    const table = document.getElementById("songTable");
+    table.innerHTML="";
+    list.forEach((song,index)=>{
+        table.innerHTML+=`
+        <tr>
+        <td>${song.name}</td>
+        <td>${song.artist}</td>
+        <td>${song.genre}</td>
+        <td><button class="delete-btn" onclick="deleteSong(${index})">刪除</button></td>
+        </tr>`;
+    });
+}
+
+function deleteSong(index){
+    if(filteredSongs){
+        const songToDelete = filteredSongs[index];
+        songs = songs.filter(s=>s!==songToDelete);
+        filteredSongs=null;
+    }else{
+        songs.splice(index,1);
+    }
+    renderTable();
+}
+
+function randomSong(){
+    const list = filteredSongs||songs;
+    if(list.length===0){ alert("歌單是空的"); return; }
+    const randomIndex = Math.floor(Math.random()*list.length);
+    const song = list[randomIndex];
+    const box = document.getElementById("randomResult");
+    box.classList.remove("show");
+    box.offsetWidth;
+    box.innerHTML = `🎶 ${song.name} - ${song.artist} (${song.genre})`;
+    box.classList.add("show");
+}
+
+function clearInputs(){
+    document.getElementById("songName").value="";
+    document.getElementById("artist").value="";
+    document.getElementById("genre").value="";
+}
+
+function multiFilter(){
+    const selectedGenres = Array.from(document.getElementsByClassName("type-btn"))
+        .filter(btn=>btn.classList.contains("selected"))
+        .map(btn=>btn.innerText.toLowerCase());
+    if(selectedGenres.length===0){ renderTable(); filteredSongs=null; return; }
+    filteredSongs = songs.filter(song=>{
+        const genres = song.genre.toLowerCase().split(",");
+        return genres.some(g=>selectedGenres.includes(g.trim()));
+    });
+    renderTable(filteredSongs);
+}
+
+function resetFilter(){
+    Array.from(document.getElementsByClassName("type-btn")).forEach(btn=>btn.classList.remove("selected"));
+    filteredSongs=null;
+    renderTable();
+}
+</script>
+
+</body>
+</html>
